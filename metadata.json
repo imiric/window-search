@@ -1,1 +1,6 @@
-{"shell-version": ["3.4.2"], "uuid": "windows-commandt@imiric.github.com", "name": "Windows Command-T", "description": "Quickly switch between open windows"}
+{
+    "shell-version": ["3.4.2"],
+    "uuid": "window-search@imiric.github.com",
+    "name": "Window Search",
+    "description": "Quickly switch between open windows by searching their title"
+}

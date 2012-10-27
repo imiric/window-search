@@ -3,6 +3,7 @@ const Main = imports.ui.main;
 const Overview = imports.ui.main.overview;
 const Lang = imports.lang;
 const Meta = imports.gi.Meta;
+const ViewSelector = imports.ui.viewSelector;
 
 
 const WindowSearch = new Lang.Class({
@@ -27,36 +28,72 @@ const WindowSearch = new Lang.Class({
 
 });
 
+function injectToFunction(parent, name, func) {
+    let origin = parent[name];
+    parent[name] = function() {
+        return func.apply(this, arguments);
+    }
+    return origin;
+}
 
-function _performSearch() {
+function injectToAttribute(parent, name, value) {
+    let origin = parent[name];
+    parent[name] = value;
+    return origin;
+}
+
+function removeInjection(object, injection, name) {
+    if (injection[name] === undefined)
+        delete object[name];
+    else
+        object[name] = injection[name];
+}
+
+let viewInjections, createdActors;
+
+function resetState() {
+    viewInjections = { };
+    createdActors = [ ];
+}
+
+function _performSearch(term) {
     let ws = new WindowSearch();
-    let results = ws.search("Chrome");
+    let results = ws.search(term);
     for (let i=0; i < results.length; i++) {
         global.log(results[i].get_title());
     }
+}
+
+function setupInjections() {
+    resetState();
+
+    viewInjections['_switchDefaultTab'] = undefined;
+
+    viewInjections['_switchDefaultTab'] = injectToFunction(ViewSelector.ViewSelector.prototype, '_switchDefaultTab', function() {
+        let text = this._searchTab._text.get_text().replace(/^\s+/g, '').replace(/\s+$/g, '');
+        this._searchTab._entry.clutter_text.connect('key-press-event', Lang.bind(this, function(o, e) {
+            _performSearch(text);
+        }));
+        for (let i = 0; i < this._tabs.length; i++) {
+            this._tabs[i].hide();
+        }
+    });
 }
 
 
 let button, icon;
 
 function enable() {
-    button = new St.Bin({ style_class: 'panel-button',
-                          reactive: true,
-                          can_focus: true,
-                          x_fill: true,
-                          y_fill: false,
-                          track_hover: true });
-    let icon = new St.Icon({ icon_name: 'system-run',
-                             icon_type: St.IconType.SYMBOLIC,
-                             style_class: 'system-status-icon' });
-
-    button.set_child(icon);
-    button.connect('button-press-event', _performSearch);
-    Main.panel._rightBox.insert_child_at_index(button, 0);
+    setupInjections();
 }
 
 function disable() {
-    Main.panel._rightBox.remove_child(button);
+    for (i in viewInjections) {
+        removeInjection(ViewSelector.ViewSelector.prototype, viewInjections, i);
+    }
+    for each (i in createdActors)
+        i.destroy();
+    resetState();
 }
 
 function init() {}
